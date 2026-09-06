@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "tasks": {
+    "create_sales_order": {
+      "aliases": ["VA01", "create sales order"],
+      "tier0": {
+        "rfc": {
+          "bapi": "BAPI_SALESORDER_CREATEFROMDAT2",
+          "commit": "BAPI_TRANSACTION_COMMIT",
+          "params": ["order_header_in", "order_items_in"],
+          "verified": null
+        }
+      },
+      "tier1": { "script": null, "platform": "java", "params": ["sold_to", "material", "qty"] },
+      "tier2": { "webgui_ok": true, "entry": "va01", "buggy": [] },
+      "tier3": { "supported": true, "notes": "fallback only" },
+      "preferred_order": ["tier0.rfc", "tier1", "tier2", "tier3"],
+      "system_overrides": {
+        "S4P": { "tier2": { "buggy": ["schedule_lines_tab"] } }
+      }
+    },
+    "read_material": {
+      "aliases": ["MM03", "display material"],
+      "tier0": {
+        "sapcli": { "op": "table_read", "table": "MARA", "verified": null }
+      },
+      "tier2": { "webgui_ok": true, "entry": "mm03", "buggy": [] },
+      "tier3": { "supported": true },
+      "preferred_order": ["tier0.sapcli", "tier2", "tier3"]
+    }
+  }
+}
