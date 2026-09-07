@@ -118,6 +118,13 @@ Table reads, run reports/programs, dev-object ops — the developer/Basis branch
 ### M3 — Router + capability catalog (the brain)
 Wire the deterministic cascade (architecture §4) + probe + promotion hooks.
 
+> **Status: code complete; live end-to-end verify PENDING** (same SAProuter
+> blocker as M1). Unit-level pass criteria all met: 61 tests, 93% cov, ruff +
+> mypy strict clean. Probe fires exactly once per unknown task, cheapest tier
+> first; results persist and reload; aged (>90d) and `STALE_CATALOG` specs
+> re-probe exactly once; `UI_BUG` is marked per-system, not globally.
+> Promotion (record a Tier 2/3 routine into Tier 1) remains M5.
+
 **Tasks**
 - Implement `route()`, `probe_and_route()`, staleness re-probe, `system_overrides`.
 - Fallback logic: runtime failure → mark catalog → next tier → report both.
