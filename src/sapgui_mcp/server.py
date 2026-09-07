@@ -13,6 +13,7 @@ from typing import Any
 
 from mcp.server.mcpserver import MCPServer
 
+from .backends import RfcBackend
 from .catalog import load_catalog
 from .models import System, Task
 from .router import Router
@@ -22,8 +23,11 @@ _DEFAULT_CATALOG = Path(__file__).resolve().parents[2] / "catalog" / "catalog.js
 
 def build_router() -> Router:
     catalog_path = os.environ.get("SAPGUI_MCP_CATALOG", str(_DEFAULT_CATALOG))
-    return Router(load_catalog(catalog_path))
-    # TODO(M1+): router.register(RfcBackend()), WebGuiBackend(), etc.
+    catalog = load_catalog(catalog_path)
+    router = Router(catalog)
+    router.register(RfcBackend(catalog))  # Tier 0 — RFC/BAPI (pyrfc loaded lazily)
+    # TODO(M2+): sapcli/OData (Tier 0), WebGUI (Tier 2), recorded (Tier 1), computer-use (Tier 3)
+    return router
 
 
 mcp = MCPServer("sapgui-mcp")

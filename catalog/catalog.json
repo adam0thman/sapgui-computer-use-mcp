@@ -19,6 +19,11 @@
         "S4P": { "tier2": { "buggy": ["schedule_lines_tab"] } }
       }
     },
+    "rfc_system_info": {
+      "aliases": ["system info", "ping"],
+      "tier0": { "rfc": { "fm": "RFC_SYSTEM_INFO", "verified": null } },
+      "preferred_order": ["tier0.rfc"]
+    },
     "read_material": {
       "aliases": ["MM03", "display material"],
       "tier0": {

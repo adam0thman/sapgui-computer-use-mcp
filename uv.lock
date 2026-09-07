@@ -899,6 +899,11 @@ crypto = [
 ]
 
 [[package]]
+name = "pyrfc"
+version = "3.4"
+source = { git = "https://github.com/SAP/PyRFC.git#5d4a20a5aee37accf32fc44ed8d668bd69332169" }
+
+[[package]]
 name = "pytest"
 version = "9.1.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1137,17 +1142,21 @@ dev = [
     { name = "pytest-cov" },
     { name = "ruff" },
 ]
+rfc = [
+    { name = "pyrfc" },
+]
 
 [package.metadata]
 requires-dist = [
     { name = "mcp", specifier = ">=1.2.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.10" },
     { name = "pydantic", specifier = ">=2.6" },
+    { name = "pyrfc", marker = "extra == 'rfc'", git = "https://github.com/SAP/PyRFC.git" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6" },
 ]
-provides-extras = ["dev"]
+provides-extras = ["dev", "rfc"]
 
 [[package]]
 name = "sse-starlette"

@@ -25,6 +25,12 @@ jco_dest*
 scripts/*.local.js
 evidence/
 
+# NW RFC SDK trace logs (generated at runtime; contain local paths/usernames)
+dev_rfc.log
+dev_rfc.trc
+*.trc
+rfc*.trc
+
 # OS / editor
 .DS_Store
 .idea/
