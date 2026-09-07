@@ -75,6 +75,19 @@ Fork `Hochfrequenz/sapgui.mcp`; strip to a clean base; establish the shared cont
 ### M1 — Tier 0: RFC/BAPI (highest value, cheapest, most testable)
 Headless RFC via pyrfc + `creds exec`.
 
+> **Status: code complete; live positive verify PENDING.**
+> Unit tests green (44 total, 94% cov, ruff + mypy strict clean). Live *negative*
+> path CONFIRMED against `ibyte-sbx-abap-s4h`: a real `RFC_COMMUNICATION_FAILURE`
+> mapped correctly to `ErrorCode.DROPPED` at Tier 0. Live *positive* path is
+> blocked — the ibyte SAProuter `s4.ibytecloud.net:3299` refuses connections
+> (ERRNO 61). Re-run when reachable:
+> `creds exec ibyte-sbx-abap-s4h -- uv run pytest -m integration`
+>
+> Setup notes: pyrfc is not on PyPI (yanked) — install via `uv sync --extra rfc`
+> with `SAPNWRFC_HOME` set to a NW RFC SDK. `backends/_sdk.py` colocates the SDK
+> dylibs next to the pyrfc extension because macOS strips `DYLD_*` across
+> `creds exec`.
+
 **Tasks**
 - RFC backend: connect via `CREDS_JCO_DEST`/`kind: rfc` entry; call function modules; map results to `Result`.
 - Read path: `RFC_READ_TABLE` (or ADT) for table reads.
