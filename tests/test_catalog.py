@@ -35,6 +35,16 @@ def test_system_override_applied() -> None:
     assert "schedule_lines_tab" in overridden.tier2.buggy
 
 
+def test_shipped_catalog_survives_save_load_roundtrip(tmp_path: Path) -> None:
+    """Learning rewrites this file — a dump must always re-validate on load."""
+    from sapgui_mcp.catalog import save_catalog
+
+    original = load_catalog(SAMPLE)
+    out = tmp_path / "roundtrip.json"
+    save_catalog(original, out)
+    assert load_catalog(out).model_dump() == original.model_dump()
+
+
 def test_unknown_task_returns_none() -> None:
     cat = load_catalog(SAMPLE)
     assert cat.lookup("does_not_exist", "ANY") is None

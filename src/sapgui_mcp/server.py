@@ -24,7 +24,8 @@ _DEFAULT_CATALOG = Path(__file__).resolve().parents[2] / "catalog" / "catalog.js
 def build_router() -> Router:
     catalog_path = os.environ.get("SAPGUI_MCP_CATALOG", str(_DEFAULT_CATALOG))
     catalog = load_catalog(catalog_path)
-    router = Router(catalog)
+    # Pass the path so probe results are written back — learn once, never re-pay.
+    router = Router(catalog, catalog_path=catalog_path)
     router.register(RfcBackend(catalog))  # Tier 0 — RFC/BAPI (pyrfc loaded lazily)
     # TODO(M2+): sapcli/OData (Tier 0), WebGUI (Tier 2), recorded (Tier 1), computer-use (Tier 3)
     return router

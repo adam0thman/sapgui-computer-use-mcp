@@ -77,15 +77,63 @@ class Catalog(_Strict):
     version: int
     tasks: dict[str, TaskEntry] = {}
 
+    def resolve_name(self, task_name: str) -> str | None:
+        """Canonical task key for a name or alias. None if unknown."""
+        if task_name in self.tasks:
+            return task_name
+        for name, e in self.tasks.items():
+            if task_name in e.aliases:
+                return name
+        return None
+
     def lookup(self, task_name: str, creds_id: str) -> TaskEntry | None:
-        entry = self.tasks.get(task_name)
-        if entry is None:
-            # alias fallback
-            for e in self.tasks.values():
-                if task_name in e.aliases:
-                    entry = e
-                    break
-        return entry.merged_for(creds_id) if entry else None
+        """Read view with system_overrides applied. NOT for mutation — it's a copy."""
+        name = self.resolve_name(task_name)
+        return self.tasks[name].merged_for(creds_id) if name else None
+
+    # -- learning (mutates the ORIGINAL entry, never the merged read-view) --------
+
+    def _entry_for_write(self, task_name: str) -> TaskEntry:
+        name = self.resolve_name(task_name)
+        if name is None:
+            self.tasks[task_name] = TaskEntry()
+            return self.tasks[task_name]
+        return self.tasks[name]
+
+    def set_spec(self, task_name: str, token: str, spec: dict[str, Any]) -> None:
+        """Record how a tier can do this task (what a probe discovered)."""
+        if token not in _ORDER_TOKENS:
+            raise ValueError(f"unknown catalog token {token!r}")
+        entry = self._entry_for_write(task_name)
+        if token.startswith("tier0."):
+            setattr(entry.tier0, token.split(".", 1)[1], spec)
+        elif token == "tier1":
+            entry.tier1 = Tier1(**spec)
+        elif token == "tier2":
+            entry.tier2 = Tier2(**spec)
+        else:
+            entry.tier3 = Tier3(**spec)
+        if token not in entry.preferred_order:
+            entry.preferred_order.append(token)
+
+    def mark_verified(self, task_name: str, token: str, today: str) -> None:
+        """Stamp a tier spec as confirmed working, so staleness checks can age it."""
+        entry = self._entry_for_write(task_name)
+        if token.startswith("tier0."):
+            spec = getattr(entry.tier0, token.split(".", 1)[1])
+            if isinstance(spec, dict):
+                spec["verified"] = today
+        elif token == "tier1":
+            entry.tier1.verified = today
+
+    def mark_buggy(self, task_name: str, creds_id: str, control: str) -> None:
+        """Flag a WebGUI control as broken — for this system only, not globally."""
+        entry = self._entry_for_write(task_name)
+        override = entry.system_overrides.setdefault(creds_id, {})
+        tier2 = override.setdefault("tier2", {})
+        buggy = tier2.setdefault("buggy", list(entry.tier2.buggy))
+        if control not in buggy:
+            buggy.append(control)
 
 
 def load_catalog(path: str | Path) -> Catalog:
@@ -94,6 +142,14 @@ def load_catalog(path: str | Path) -> Catalog:
     cat = Catalog(**raw)
     _validate_order_tokens(cat)
     return cat
+
+
+def save_catalog(cat: Catalog, path: str | Path) -> None:
+    """Persist learned capability back to disk. Written atomically to avoid a torn file."""
+    target = Path(path)
+    tmp = target.with_suffix(target.suffix + ".tmp")
+    tmp.write_text(json.dumps(cat.model_dump(mode="json"), indent=2) + "\n", encoding="utf-8")
+    tmp.replace(target)
 
 
 def _validate_order_tokens(cat: Catalog) -> None:

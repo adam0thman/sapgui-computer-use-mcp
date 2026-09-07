@@ -71,6 +71,17 @@ class Confidence:
     reason: str = ""
 
 
+@dataclass(frozen=True, slots=True)
+class ProbeHit:
+    """A backend's discovery that it CAN do a task, plus the spec to remember.
+
+    `token` is a catalog preferred_order token, e.g. "tier0.rfc".
+    """
+
+    token: str
+    spec: dict[str, Any]
+
+
 @dataclass(slots=True)
 class Result:
     ok: bool
