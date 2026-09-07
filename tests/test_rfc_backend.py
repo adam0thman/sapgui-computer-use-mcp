@@ -137,6 +137,44 @@ def test_no_rfc_spec_declines_and_not_found() -> None:
     assert not res.ok and res.error.code == ErrorCode.NOT_FOUND
 
 
+# -- probe (M3 capability discovery) ------------------------------------------
+
+def test_probe_finds_existing_function_module() -> None:
+    conn = FakeConn({"RFC_READ_TABLE": {"FIELDS": [{"FIELDNAME": "FUNCNAME"}],
+                                        "DATA": [{"WA": "BAPI_USER_GET_DETAIL"}]}})
+    hit = _backend(Catalog(version=1), conn).probe(Task("BAPI_USER_GET_DETAIL"), _SYS)
+    assert hit is not None
+    assert hit.token == "tier0.rfc" and hit.spec == {"fm": "BAPI_USER_GET_DETAIL"}
+
+
+def test_probe_returns_none_when_fm_absent() -> None:
+    conn = FakeConn({"RFC_READ_TABLE": {"FIELDS": [{"FIELDNAME": "FUNCNAME"}], "DATA": []}})
+    assert _backend(Catalog(version=1), conn).probe(Task("BAPI_NOPE"), _SYS) is None
+
+
+def test_probe_is_read_only() -> None:
+    conn = FakeConn({"RFC_READ_TABLE": {"FIELDS": [{"FIELDNAME": "FUNCNAME"}],
+                                        "DATA": [{"WA": "BAPI_X"}]}})
+    _backend(Catalog(version=1), conn).probe(Task("BAPI_X"), _SYS)
+    assert conn.calls == ["RFC_READ_TABLE", "__close__"]  # never executes the task
+
+
+def test_probe_rejects_names_that_are_not_fm_identifiers() -> None:
+    """Trust boundary: the name reaches a WHERE clause — reject, never escape."""
+    conn = FakeConn()
+    b = _backend(Catalog(version=1), conn)
+    for bad in ("bapi'; DROP TABLE T000--", "create sales order", "x", "A" * 31, "BAPI X"):
+        assert b.probe(Task(bad), _SYS) is None
+    assert conn.calls == []  # nothing injectable ever reached SAP
+
+
+def test_probe_survives_connection_failure() -> None:
+    def boom(system: System) -> FakeConn:
+        raise CommunicationError("partner not reached")
+
+    assert RfcBackend(Catalog(version=1), connector=boom).probe(Task("BAPI_X"), _SYS) is None
+
+
 def test_unknown_spec_shape_is_param_invalid() -> None:
     cat = _catalog("weird", {"something": "unexpected"})
     res = _backend(cat, FakeConn()).execute(Task("weird"), {}, _SYS)

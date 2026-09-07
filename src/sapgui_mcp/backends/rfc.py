@@ -13,10 +13,16 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from typing import Any, Protocol
 
 from ..catalog import Catalog
-from ..models import Confidence, ErrorCode, ErrorInfo, Result, System, Task, Tier
+from ..models import Confidence, ErrorCode, ErrorInfo, ProbeHit, Result, System, Task, Tier
+
+# A task name is only treated as a function-module name if it matches this exactly.
+# This is a TRUST BOUNDARY: the name reaches a WHERE clause, so anything outside
+# SAP's own identifier charset is rejected rather than escaped.
+_FM_NAME = re.compile(r"^[A-Z0-9_/]{3,30}$")
 
 log = logging.getLogger(__name__)
 
@@ -68,6 +74,40 @@ class RfcBackend:
         if self._spec_for(task, system) is None:
             return Confidence(False, "no tier0.rfc spec for task")
         return Confidence(True, "rfc spec present")
+
+    def probe(self, task: Task, system: System) -> ProbeHit | None:
+        """Discover capability: does a function module of this name exist here?
+
+        Read-only — it establishes capability, it never performs the task.
+
+        Heuristic and deliberately narrow: it only matches when the task name IS
+        the function-module name (e.g. "BAPI_USER_GET_DETAIL"). Mapping arbitrary
+        business tasks to BAPIs needs more than a name lookup; until then an
+        unmatched task simply falls to a later tier.
+        """
+        candidate = task.name.strip().upper()
+        if not _FM_NAME.match(candidate):
+            return None
+        try:
+            conn = self._connect(system)
+        except Exception:
+            log.debug("probe could not connect for %s", task.name, exc_info=True)
+            return None
+        try:
+            out = conn.call(
+                "RFC_READ_TABLE",
+                QUERY_TABLE="TFDIR",
+                DELIMITER="|",
+                FIELDS=[{"FIELDNAME": "FUNCNAME"}],
+                OPTIONS=[{"TEXT": f"FUNCNAME = '{candidate}'"}],
+                ROWCOUNT=1,
+            )
+            return ProbeHit("tier0.rfc", {"fm": candidate}) if out.get("DATA") else None
+        except Exception:
+            log.debug("probe failed for %s", task.name, exc_info=True)
+            return None
+        finally:
+            _safe_close(conn)
 
     def execute(
         self, task: Task, params: dict[str, Any], system: System, *, dry_run: bool = False

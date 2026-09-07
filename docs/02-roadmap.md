@@ -75,13 +75,19 @@ Fork `Hochfrequenz/sapgui.mcp`; strip to a clean base; establish the shared cont
 ### M1 — Tier 0: RFC/BAPI (highest value, cheapest, most testable)
 Headless RFC via pyrfc + `creds exec`.
 
-> **Status: code complete; live positive verify PENDING.**
-> Unit tests green (44 total, 94% cov, ruff + mypy strict clean). Live *negative*
-> path CONFIRMED against `ibyte-sbx-abap-s4h`: a real `RFC_COMMUNICATION_FAILURE`
-> mapped correctly to `ErrorCode.DROPPED` at Tier 0. Live *positive* path is
-> blocked — the ibyte SAProuter `s4.ibytecloud.net:3299` refuses connections
-> (ERRNO 61). Re-run when reachable:
-> `creds exec ibyte-sbx-abap-s4h -- uv run pytest -m integration`
+> **Status: DONE — live-verified against `ibyte-sbx-abap-s4h` (S4H, rel 757, HDB/Linux).**
+>
+> | Criterion | Result |
+> |---|---|
+> | FM call (`RFC_SYSTEM_INFO`) | ✅ live — returned real system info |
+> | Table read (`T000`) | ✅ live — 4 client rows parsed correctly |
+> | Write safety: error blocks commit | ✅ live — real `E V1312` → ROLLBACK issued, **COMMIT never called**, `mutated=False` |
+> | Comm failure → typed error | ✅ live — real `RFC_COMMUNICATION_FAILURE` → `DROPPED` |
+> | AUTH / LOCKED / PARAM_INVALID mapping | ✅ unit |
+> | **Successful BAPI create that commits** | ⏳ **NOT verified** — needs valid master data (customer/material/sales org) in this IDES client |
+>
+> The dry-run/commit *mechanics* are unit-tested and the failure path is live-proven;
+> only a successful committing write remains unexercised against real SAP.
 >
 > Setup notes: pyrfc is not on PyPI (yanked) — install via `uv sync --extra rfc`
 > with `SAPNWRFC_HOME` set to a NW RFC SDK. `backends/_sdk.py` colocates the SDK
@@ -118,11 +124,22 @@ Table reads, run reports/programs, dev-object ops — the developer/Basis branch
 ### M3 — Router + capability catalog (the brain)
 Wire the deterministic cascade (architecture §4) + probe + promotion hooks.
 
-> **Status: code complete; live end-to-end verify PENDING** (same SAProuter
-> blocker as M1). Unit-level pass criteria all met: 61 tests, 93% cov, ruff +
-> mypy strict clean. Probe fires exactly once per unknown task, cheapest tier
-> first; results persist and reload; aged (>90d) and `STALE_CATALOG` specs
-> re-probe exactly once; `UI_BUG` is marked per-system, not globally.
+> **Status: DONE — live-verified against `ibyte-sbx-abap-s4h`.**
+>
+> Live run from an empty catalog: unknown task → probed **exactly once** (real
+> `TFDIR` lookup) → learned → persisted with a `verified` stamp → executed
+> successfully. Second call was a cache hit with **no second probe**. That is the
+> core cost mechanism working against real SAP.
+>
+> Unit-level: probe fires cheapest-tier-first (expensive tiers never asked once a
+> cheaper one hits); aged (>90d) and `STALE_CATALOG` specs re-probe exactly once;
+> `UI_BUG` marked per-system, not globally; prod guard runs before any probe cost.
+>
+> `RfcBackend.probe` is the first real prober. Its heuristic is deliberately
+> narrow — it matches only when the task name IS the function-module name. Mapping
+> arbitrary business tasks to BAPIs is a later concern; unmatched tasks fall to a
+> later tier. The task name is regex-validated before reaching a WHERE clause.
+>
 > Promotion (record a Tier 2/3 routine into Tier 1) remains M5.
 
 **Tasks**
