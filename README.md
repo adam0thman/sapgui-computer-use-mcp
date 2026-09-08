@@ -42,6 +42,33 @@ uv run ruff check .
 uv run mypy
 ```
 
+### Spec-Driven Development (spec-kit)
+
+This repo uses [github/spec-kit](https://github.com/github/spec-kit) — specs are
+written before implementation and drive it. The project's binding principles live in
+[`.specify/memory/constitution.md`](.specify/memory/constitution.md): the cost ladder,
+programmatic-over-screen-driving, positive **and** negative testing, the prod guard,
+and the Definition of Done. Generated specs never override it.
+
+Workflow for a new milestone or feature:
+
+| Step | Command | Produces |
+|---|---|---|
+| 1 | `/speckit-specify` | *what* to build (requirements, user stories) |
+| 2 | `/speckit-clarify` *(optional)* | resolves ambiguity before planning |
+| 3 | `/speckit-plan` | technical approach, tier placement |
+| 4 | `/speckit-tasks` | actionable task list |
+| 5 | `/speckit-analyze` *(optional)* | consistency check vs. the constitution |
+| 6 | `/speckit-implement` | executes the tasks |
+
+Artifacts land in `specs/`. The constitution is the contract: every plan must state
+which **tier** a capability belongs to and why a cheaper tier can't do it.
+
+Re-initialise or update the tooling:
+```bash
+uvx --from git+https://github.com/github/spec-kit.git specify init --here --force --integration claude
+```
+
 Credentials are resolved **only** through the `creds` CLI (`creds exec <id> -- ...`);
 no secrets live in this repo or the catalog. Production writes are refused unless
 explicitly authorized.
