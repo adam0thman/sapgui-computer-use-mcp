@@ -24,3 +24,15 @@ def test_sap_execute_prod_guard_dict() -> None:
 
 def test_tier_enum_serializes_to_int() -> None:
     assert int(Tier.COMPUTER_USE) == 3
+
+
+def test_package_version_matches_pyproject() -> None:
+    """Release guard: __version__ and pyproject must never drift apart."""
+    import tomllib
+    from pathlib import Path
+
+    import sapgui_mcp
+
+    pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
+    declared = tomllib.loads(pyproject.read_text())["project"]["version"]
+    assert sapgui_mcp.__version__ == declared

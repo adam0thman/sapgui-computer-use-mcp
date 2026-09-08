@@ -8,4 +8,4 @@ See docs/01-architecture.md.
 from .models import ErrorCode, ErrorInfo, Result, System, Task, Tier
 
 __all__ = ["ErrorCode", "ErrorInfo", "Result", "System", "Task", "Tier"]
-__version__ = "0.0.1"
+__version__ = "0.1.0"
