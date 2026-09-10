@@ -63,6 +63,29 @@ else
   ok "no attached sheets, no modal windows"
 fi
 
+# --------------------------------------- 2b. SAP modal popup owning input
+# The one that actually bites. SAP GUI for Java renders dynpro popups
+# ("Multiple Selection for...", "Note Assistant: ...") as SEPARATE AXWindows with
+# AXModal=false and no attached sheet — so a sheet/modal check reports all clear
+# while the session is fully blocked. The reliable signal is AXFocusedWindow: if
+# it is not a session window (SID (n) (client)), a popup owns input.
+focw=$(osascript -e "with timeout of 15 seconds
+tell application \"System Events\" to tell process \"$APP\"
+try
+return name of (value of attribute \"AXFocusedWindow\")
+on error
+return \"\"
+end try
+end tell
+end timeout" 2>/dev/null)
+if [ -z "$focw" ]; then
+  warn "no AX focused window — $APP may not be active"
+elif printf '%s' "$focw" | grep -qE '^[A-Z0-9]+ \([0-9]+\) \([0-9]+\)$'; then
+  ok "focused window is a session: [$focw]"
+else
+  block "a SAP popup owns input: [$focw] — dismiss it before driving the session"
+fi
+
 # ------------------------------------------------------ 3. AX-visible windows
 axwins=$(osascript -e "with timeout of 15 seconds
 tell application \"System Events\" to tell process \"$APP\"
