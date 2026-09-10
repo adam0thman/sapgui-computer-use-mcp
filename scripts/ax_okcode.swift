@@ -1,19 +1,30 @@
-// Tier-2.5: drive SAP GUI for Java via Accessibility + targeted key events.
+// Tier-2.5: drive SAP GUI for Java through the macOS Accessibility (AX) API.
 //
-// Coordinate/vision control fails three ways on macOS: the frontmost-app tier
-// policy refuses input, sessions sharing geometry make clicks land on the wrong
-// window, and neither failure is visible on screen. This path avoids all three.
+// MEASURED capability map (SAP GUI for Java 8.10rev4, 312 elements scanned).
+// Everything below was tested, not assumed:
 //
-// SAP GUI for Java exposes NO settable AXValue, so text cannot be written
-// directly. What it does expose is settable AXFocused on every field and AXPress
-// on every button. So: focus the target element by name inside ONE named window,
-// then post key events straight to the process with CGEvent.postToPid — which
-// does not require the app to be frontmost.
+//   WORKS with the app in the BACKGROUND (no frontmost, no coordinates, no vision):
+//     - reading the whole UI tree: roles, labels, values, geometry
+//     - AXFocusedWindow to detect a SAP popup owning input
+//     - AXRaise on a specific window  -> unambiguous session targeting
+//     - AXMain is settable
+//     - AXPress on any button        -> real write capability
 //
-//   probe <win>            read-only: list the command field + named buttons
-//   type  <win> <text>     focus command field, type, DO NOT execute
-//   run   <win> <text>     ...then press Enter (EXECUTES, e.g. "/nSE37")
-//   press <win> <button>   AXPress a button by name, e.g. "Back (F3)"
+//   DOES NOT WORK:
+//     - AXValue is settable NOWHERE, so text cannot be written via AX
+//     - AXFocused is accepted and SILENTLY DISCARDED (IsAttributeSettable says
+//       true, the set returns .success, focus never moves) - focus is unsteerable
+//     - CGEvent.postToPid does NOT reach the app while it is in the background;
+//       a full scan of every field showed no delivery. Keystrokes require the app
+//       to be genuinely frontmost.
+//
+// Net: BUTTONS yes, TEXT no. Navigation and state-reading are free and robust;
+// text entry still needs SAP GUI frontmost and is the one fragile step left.
+//
+//   probe <win>            read-only: command field + named buttons
+//   press <win> <button>   AXPress by name, e.g. "Back (F3)" - background-safe
+//   type  <win> <text>     type into the command field - REQUIRES frontmost
+//   run   <win> <text>     ...then Enter (EXECUTES, e.g. "/nSE37")
 //
 import AppKit
 import ApplicationServices
@@ -121,14 +132,34 @@ if let fw = attr(axApp, "AXFocusedWindow") {
 guard let cf = find(win, role: kAXTextFieldRole as String, label: "command field") else {
     print("FAIL: command field not found"); exit(3)
 }
-AXUIElementSetAttributeValue(cf, kAXFocusedAttribute as CFString, kCFBooleanTrue)
-usleep(150_000)
-let focused = (attr(cf, kAXFocusedAttribute) as? Bool) ?? false
-print("focus set: \(focused)")
+// SAP GUI for Java ACCEPTS AXFocused writes and silently discards them:
+// IsAttributeSettable reports true, the set returns .success, focus never moves.
+// So focus cannot be steered via AX. What does work is AXRaise on the specific
+// window (unambiguous targeting even when sessions share geometry) followed by
+// key events posted to the pid — which land without the app being frontmost.
+let raised = AXUIElementPerformAction(win, kAXRaiseAction as CFString) == .success
+print("raise: \(raised)")
+// Keystrokes are dropped unless the app is genuinely frontmost - verified by
+// scanning every field after a background post and finding no change anywhere.
+NSWorkspace.shared.runningApplications.first { $0.processIdentifier == pid }?.activate(options: [])
+usleep(900_000)
+let fm = NSWorkspace.shared.frontmostApplication?.localizedName ?? "?"
+if fm != "SAPGUI" {
+    print("WARN: frontmost is [\(fm)], not SAPGUI - keystrokes will be dropped.")
+}
 
+let before = s(cf, kAXValueAttribute) ?? ""
 post(arg, pid: pid)
-usleep(250_000)
-print("after type: field=[\(s(cf, kAXValueAttribute) ?? "")]")
+usleep(500_000)
+let after = s(cf, kAXValueAttribute) ?? ""
+print("type: before=[\(before)] after=[\(after)] delivered=\(after.contains(arg))")
+
+// Keystrokes land wherever SAP's own focus already sits. That is usually the
+// command field, but it is NOT selectable from outside — verify, never assume.
+if !after.contains(arg) {
+    print("WARN: text did not reach the command field; SAP focus is elsewhere.")
+    exit(1)
+}
 
 if mode == "run" {
     postKey(36, pid: pid)   // Return
