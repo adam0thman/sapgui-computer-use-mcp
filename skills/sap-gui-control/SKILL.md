@@ -85,6 +85,37 @@ if a name matches more than one window rather than silently picking one.
 - selecting text in `AXStaticText` (ordinary screen content) — readable, not selectable.
 - `screencapture` of an occluded SAP window — returns a blank buffer.
 
+## Known gaps in SAP GUI for Java itself (not AX gaps)
+
+Some SAP functions call out to a **frontend component** rather than drawing a normal screen.
+SAP GUI for Java implements only a subset of these, and an unimplemented one **fails silently** —
+ABAP accepts the click, no error is raised, and nothing renders.
+
+Observed: in SCC3 (Client Copy Log Analysis) the **Monitor** button does nothing on Java. The
+press registers (`AXPress -> success`) and the screen is unchanged 9s later. The session's system
+info showed the running program as **`SAPLGRAP`** — SAP's frontend-services function group, which
+is also what sits behind frontend file dialogs and the legacy business graphics. The same
+transaction opens a self-refreshing monitor window on SAP GUI for Windows.
+
+Implications:
+
+- A button that "does nothing" may be a **missing frontend component**, not a blocked input. The
+  preflight will come back clear in this case — that is the tell.
+- This is the nearest real thing to the phantom "save/open dialog": a screen that calls
+  `SAPLGRAP` can sit waiting on a frontend component that never renders. It is an unrendered SAP
+  frontend call, not a macOS dialog. Do not describe it as one.
+- Prefer plain-dynpro equivalents, which always work: `SM50`/`SM66` for what a job is currently
+  doing, `SM37` for job status, or read the underlying tables over RFC.
+
+## AX cannot read classic SAP list output
+
+Screens that render a **SAP list** (the old write-style report output, e.g. the SCC3 log body)
+expose almost nothing to accessibility — in one SCC3 screen the entire log, including every
+statistic visible on screen, produced 9 static texts and none of the numbers.
+
+So the AX tier reads **dynpro screens** well and **list output** not at all. When the content you
+need is list output, do not screen-scrape it — take it from RFC / a table read instead.
+
 ## Prefer a cheaper route first
 
 GUI control is the **last** resort. Before driving the GUI, check whether the task can be done:
